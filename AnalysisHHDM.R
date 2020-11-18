@@ -1,3 +1,7 @@
+########################################################################
+#Intra-Household Decision Making in Kakira Uganda Analysis
+######################################################################## 
+
 #install.packages("tidyverse")
 #install.packages("Matching")
 #install.packages("ivreg", dependencies = TRUE)
@@ -196,6 +200,7 @@ for (vars in reglist){
 }
 
 ittRes<-data.frame(regmodelitt)
+write.csv(ittRes,file=paste0(getwd(),outr,"/ITTresults.csv"))
 #Creating attendance variable to calculate LATE through 2sls method
 finalhhd[,"assignandattend"] <-ifelse(finalhhd[,"WI_hh_fully_attended_workshop"] == 1 & finalhhd[,"treat_workshop"] == 1,1,0)
 
@@ -208,6 +213,8 @@ for (vars in reglist){
 
 lateRes<-data.frame(regmodellate)
 
+
+
 ########################################################################
-# Step 6.Running evaluation regressions and exporting data
+# End of Code
 ######################################################################## 

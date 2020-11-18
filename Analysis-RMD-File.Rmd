@@ -77,9 +77,9 @@ outp<-"/out/Household Data"
 ### Step 2. Importing data from field (household data dta format)
 
 ```{r}
-data1<-read_dta(file=paste0(getwd(),raw,"/midline_merged_anon_1.dta"))
-data2<-read_dta(file=paste0(getwd(),raw,"/midline_merged_anon_2.dta"))
-data3<-read_dta(file=paste0(getwd(),raw,"/midline_merged_anon_3.dta"))
+data1<-read.csv(file=paste0(getwd(),raw,"/midline_merged_anon_1.csv"))
+data2<-read.csv(file=paste0(getwd(),raw,"/midline_merged_anon_2.csv"))
+data3<-read.csv(file=paste0(getwd(),raw,"/midline_merged_anon_3.csv"))
 ```
 
 ### Step 3. Merging data from the different datasets
@@ -269,6 +269,7 @@ ittRes<-data.frame(regmodelitt)
 #Creating attendance variable to calculate LATE through 2sls method
 finalhhd[,"assignandattend"] <-ifelse(finalhhd[,"WI_hh_fully_attended_workshop"] == 1 & finalhhd[,"treat_workshop"] == 1,1,0)
 
+write.csv(ittRes,file=paste0(getwd(),outr,"/ITTresults.csv"))
 #LATE
 
 for (vars in reglist){
@@ -277,6 +278,12 @@ for (vars in reglist){
 }
 
 lateRes<-data.frame(regmodellate)
+write.csv(lateRes,file=paste0(getwd(),outr,"/LATEresults.csv"))
+
+#Exporting tables
+write.csv(balResults,file=paste0(getwd(),outr,"/balResults.csv"))
+write.csv(ksTable,file=paste0(getwd(),outr,"/ksResults.csv"))
+write.csv(tidy(joctest),file=paste0(getwd(),outr,"/joRegs.csv"))
 ```
 
 ## End of File
