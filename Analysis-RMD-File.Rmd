@@ -1,0 +1,282 @@
+---
+Title:"Intra Household Decision Making"
+Output: html_document
+---
+
+##Intra-Household Decision Making in Uganda
+**Objective**: 
+-To analyse the household characteristics of households who participated in a randomizaed control trial in Kakira, Uganda and evaluate the impact of a workshop teaching cooperative decision making to husbands and wives on within family dynamics.
+-Generate and compare the different available indices to evaluate household decision making.
+		   
+**Name of person editing**: Joseph Thomas
+**Date**: 11/10/2020
+_The program was initially analyzed on Stata version and operating system by editor and 4 collaborators (Parthu, Chhavi, Diana, Meaghan): Stata 14 MacOS Catalina_
+
+_The code has been transferred into R for the purpose of applying to Civis Analytics by the editor_
+
+**Main objective of code** 
+-Clean and merge the household data.  Evaluate the impact of the workshop program and generate relevant tables.
+
+-Steps 
+  1. Map system folders to different users
+	2. Importing data from field (household data dta format)
+	3. Merging data from the different datasets
+	4. Creating Stratification Variables and Index Variables
+	5. Running diagnostics to check the independence of treatment group and control group
+	6. Running evaluation regressions and exporting data
+	7. Create balance tables
+	
+#### All necessary packages
+
+```{r}
+#install.packages("tidyverse")
+#install.packages("Matching")
+#install.packages("ivreg", dependencies = TRUE)
+library(tidyverse) 
+library(haven)
+library(openxlsx)
+library(tibble)
+library(broom)
+library(dplyr)
+library(Matching)
+library("ivreg")
+```
+
+### Step 1: Map Systems to different users
+Mapping folders so that group members can comprehend and access the different data and optput files.
+The original evaluation was conducted by a 5 member team who used different operating systems so the following lines of code are intended at streamlining the process of storing all information. 
+
+#### Getting the operating system and setting appropriate working directories:
+```{r}
+sysinf <- Sys.info()
+uname <- sysinf['user']
+if (!is.null(sysinf)){
+  os<-sysinf['sysname']
+  if (os == 'Darwin'){
+      setwd(paste0("/Users/",uname,"/Documents/Projects/Household Decision-making"))
+    }
+} else { 
+    if (grepl("^darwin", R.version$os)){
+      setwd(paste0("/Users/",uname,"/Documents/Projects/Household Decision-making"))
+    }
+    if (grepl("linux-gnu", R.version$os)){
+      setwd(pate0("/home/",uname,"/Documents/Projects/Household Decision-making"))
+    }
+}
+rm(list=ls()) #To remove the files created for setting working directory
+```
+
+#### Assigning subdirectory names
+```{r}
+raw<-"/rawdta/Household Data"
+outr<-"/outreg/Household Data"
+temp<-"/temp/Temp"
+outp<-"/out/Household Data"
+```
+
+### Step 2. Importing data from field (household data dta format)
+
+```{r}
+data1<-read_dta(file=paste0(getwd(),raw,"/midline_merged_anon_1.dta"))
+data2<-read_dta(file=paste0(getwd(),raw,"/midline_merged_anon_2.dta"))
+data3<-read_dta(file=paste0(getwd(),raw,"/midline_merged_anon_3.dta"))
+```
+
+### Step 3. Merging data from the different datasets
+
+```{r}
+v1<-"HHID BL_block_num BL_collat BL_reg_num BL_kakira BL_wives_num BL_desig_wife_length_marriage BL_age_pay_rec BL_age_pay_rec_oth1 BL_age_pay_rec_oth2 BL_age_pay_rec_oth3 BL_gender_pay_rec BL_gender_pay_rec_oth1 BL_gender_pay_rec_oth2 BL_gender_pay_rec_oth3 BL_crop_name_1 BL_crop_name_2 BL_crop_name_3 BL_crop_name_4 BL_crop_harv_quant_1 BL_crop_harv_quant_2 BL_crop_harv_quant_3 BL_crop_harv_quant_4 BL_crop_sold_quant_1 BL_crop_sold_quant_2 BL_crop_sold_quant_3 BL_crop_sold_quant_4 BL_crop_value_1 BL_crop_value_2 BL_crop_value_3 BL_crop_value_4 BL_crop_dec_resp_1 BL_crop_dec_resp_2 BL_crop_dec_resp_3 BL_crop_dec_resp_4 BL_crop_sales_resp_1 BL_crop_sales_resp_2 BL_crop_sales_resp_3 BL_crop_sales_resp_4 BL_spend_child BL_spend_female BL_spend_female BL_spend_oth BL_spend_total BL_tribe_h BL_tribe_w BL_religion_h BL_religion_w BL_read_self_h BL_read_self_w BL_write_self_h BL_write_self_w BL_edu_comp_self_h BL_edu_comp_self_w BL_block_pay BL_block_pay_1 BL_block_pay_2 BL_block_pay_3 BL_block_pay_4 BL_block_pay_5 BL_block_pay_6 BL_c_block_area BL_block_area_1 BL_block_area_2 BL_block_area_3 BL_block_area_4 BL_block_area_5 BL_block_area_6 BL_reg_hold BL_reg_hold_1 BL_reg_hold_2 BL_reg_hold_3 BL_reg_hold_4 BL_reg_hold_5 BL_reg_hold_6 BL_reg_yr BL_reg_yr_1 BL_reg_yr_2 BL_reg_yr_3 BL_reg_yr_4 BL_reg_yr_5 BL_reg_yr_6 BL_harv_next_yr_1 BL_harv_next_yr_2 BL_harv_next_yr_3 BL_harv_next_yr_4 BL_harv_next_yr_5 BL_harv_next_yr_6 BL_inputs BL_prep BL_prep_credit BL_fert BL_pest BL_water BL_labor BL_trans BL_cash BL_harv BL_harv_sell_quant BL_price BL_net BL_pay_cash BL_pay_prim BL_lab_sug_mth_h BL_lab_sug_mth_w BL_sug_day_h BL_sug_day_w BL_sug_hr_h BL_sug_hr_w BL_sug_act_h BL_sug_act_w BL_non_day_h BL_non_day_w BL_non_hr_h BL_non_hr_w BL_wage_h BL_wage_w BL_farm_wage_earn_h BL_farm_wage_earn_w BL_nonfarm_wage_earn_h BL_nonfarm_wage_earn_w BL_prod_day_housework_h BL_prod_day_waterwood_h BL_prod_day_leisure_h BL_prod_day_housework_w BL_prod_day_waterwood_w BL_prod_day_leisure_w BL_prod_hr_housework_h BL_prod_hr_waterwood_h BL_prod_hr_leisure_h BL_prod_hr_housework_w BL_prod_hr_waterwood_w BL_prod_hr_leisure_w BL_effort_h BL_effort_w BL_effort_spouse_h BL_effort_spouse_w BL_opinion_h BL_opinion_w BL_finalsay_h BL_finalsay_w BL_oth_opinion1_h BL_oth_opinion1_w BL_shouldbe_h BL_shouldbe_w BL_save_h BL_save_w BL_save_hh_h BL_save_hh_w BL_bank_h BL_bank_w BL_loan_h BL_loan_w BL_consump_clothes_h BL_consump_clothes_w BL_consump_hair_h BL_consump_hair_w BL_consump_alc_h BL_consump_alc_w BL_consump_gift_h BL_consump_gift_w BL_know_blocks BL_know_quant BL_food1 BL_food2 BL_food3 BL_food4 BL_food5 BL_food6 BL_food7 BL_food8 BL_food9 BL_food10_ BL_pregnant BL_preg_avoid BL_dec_cont BL_dec_use_h BL_dec_use_w BL_dec_spouse_h BL_dec_spouse_w BL_dec_healthself_h BL_dec_healthself_w BL_dec_healthchild_h BL_dec_healthchild_w BL_dec_major_h BL_dec_major_w BL_dec_minor_h BL_dec_minor_w  BL_dec_visits_h BL_dec_visits_w BL_marqual1_h BL_marqual2_h BL_marqual3_h BL_marqual4_h BL_marqual9_h BL_marqual10_h BL_marqual1_w BL_marqual2_w BL_marqual3_w BL_marqual4_w BL_marqual9_w BL_marqual10_w BL_dv_ever_h BL_dv_ever_w BL_dv_freq_male_h BL_dv_freq_female_w BL_dv_reg_h BL_dv_reg_w treat_workshop treat_contract BL_school_self_w BL_any_selfish_ineff BL_WH_dummy"
+
+hhd1<- v1 %>% strsplit("[[:space:]]") %>% unlist() %>% match(names(data1)) %>% sort() %>% data1[,.]
+
+v2<-"HHID BL_ent_num BL_ind_code_1 BL_ind_code_2 BL_ind_code_3 BL_ind_code_4 BL_ent_mgr_1 BL_ent_mgr_2 BL_ent_mgr_3 BL_ent_mgr_4 BL_ent_profit_1 BL_ent_profit_2 BL_ent_profit_3 BL_ent_profit_4 BL_crop_name_5 BL_crop_name_6 BL_crop_name_7 BL_crop_name_8 BL_crop_name_9 BL_crop_name_10 BL_crop_name_11 BL_crop_name_12 BL_crop_fert BL_crop_pest BL_crop_hire_amt BL_crop_harv_quant_5 BL_crop_harv_quant_6 BL_crop_harv_quant_7 BL_crop_harv_quant_8 BL_crop_harv_quant_9 BL_crop_harv_quant_10 BL_crop_harv_quant_11 BL_crop_harv_quant_12 BL_crop_sold_quant_5 BL_crop_sold_quant_6 BL_crop_sold_quant_7 BL_crop_sold_quant_8 BL_crop_sold_quant_9 BL_crop_sold_quant_10 BL_crop_sold_quant_11 BL_crop_sold_quant_12 BL_crop_value_5 BL_crop_value_6 BL_crop_value_7 BL_crop_value_8 BL_crop_value_9 BL_crop_value_10 BL_crop_value_11 BL_crop_value_12 BL_crop_dec_resp_5 BL_crop_dec_resp_6 BL_crop_dec_resp_7 BL_crop_dec_resp_6 BL_crop_dec_resp_7 BL_crop_dec_resp_8 BL_crop_dec_resp_9 BL_crop_dec_resp_10 BL_crop_dec_resp_11 BL_crop_dec_resp_12 BL_crop_sales_resp_5 BL_crop_sales_resp_6 BL_crop_sales_resp_7 BL_crop_sales_resp_8 BL_crop_sales_resp_9 BL_crop_sales_resp_10 BL_crop_sales_resp_11 BL_crop_sales_resp_12 BL_school_child_1 BL_school_child_2 BL_school_child_3 BL_school_child_4 BL_school_child_5 BL_school_child_6 BL_school_child_7 BL_school_child_8 BL_school_child_9 BL_school_child_10 BL_school_child_11 BL_spend_total_ed_1 BL_spend_total_ed_2 BL_spend_total_ed_3 BL_spend_total_ed_4 BL_spend_total_ed_5 BL_spend_total_ed_6 BL_spend_total_ed_7 BL_spend_total_ed_8 BL_spend_total_ed_9 BL_spend_total_ed_10 BL_spend_total_ed_11"
+
+hhd2<- v2 %>% strsplit("[[:space:]]") %>% unlist() %>% match(names(data2)) %>% sort() %>% data2[,.]
+
+v3<-"keep HHID BL_wife_arrange_1 BL_wife_arrange_2 BL_wife_arrange_3 BL_wife_arrange_4 BL_wife_arrange_5 BL_wife_arrange_6 BL_child_num BL_child_live BL_wife_type_1 BL_wife_type_2 BL_wife_type_3 BL_wife_type_4 BL_wife_type_5 BL_wife_type_6 WI_flag_mult_wkshp_h WI_flag_mult_wkshp_w WI_mult_wkshp_invite WI_v1_date WI_v1_response WI_v2_date WI_v2_response WI_v3_date WI_v3_response WI_workshop_date WI_attended_workshop_h WI_d1_attend_h WI_d1_attend_any_h WI_d1_attend_full_h WI_d1_partial_h WI_d2_attend_h WI_d2_attend_any_h WI_d2_attend_full_h WI_d2_partial_h WI_d3_attend_h WI_d3_attend_any_h WI_d3_attend_full_h WI_d3_partial_h WI_attended_workshop_w WI_d1_attend_w WI_d1_attend_any_w WI_d1_attend_full_w WI_d1_partial_w WI_d2_attend_w WI_d2_attend_any_w WI_d2_attend_full_w WI_d2_partial_w WI_d3_attend_w WI_d3_attend_any_w WI_d3_attend_full_w WI_d3_partial_w WI_hh_fully_attended_workshop WI_official_wkshp_invite_order WI_workshop_date_1 WI_final_visit_status_1 WI_reallocation_1 WI_attended_workshop_h_1 WI_attended_workshop_w_1 WI_workshop_venue_w_1 WI_hh_fully_attended_workshop_1 WI_workshop_date_2 WI_final_visit_status_2 WI_reallocation_2 WI_attended_workshop_h_2 WI_attended_workshop_w_2 WI_workshop_venue_w_2 WI_hh_fully_attended_workshop_2 WI_workshop_venue_3 WI_workshop_date_3 WI_final_visit_status_3 WI_reallocation_3 WI_attended_workshop_h_3 WI_workshop_venue_h_3 WI_attended_workshop_w_3 WI_workshop_venue_w_3 WI_hh_fully_attended_workshop_3 WI_both_2_days_1 WI_both_2_days_2 WI_both_2_days_3 WI_mobilized_1 WI_mobilized_2 WI_mobilized_3 WI_category_1 WI_category_2 WI_category_3 WI_mobilizer_1 WI_mobilizer_2 WI_mobilizer_3 WI_hh_fully_attended_workshop WI_hh_fully_attended_workshop_1 WI_hh_fully_attended_workshop_2 WI_hh_fully_attended_workshop_3 ML_dec_earn ML_dec_earn_a ML_dec_use ML_dec_use_a ML_dec_spouse ML_dec_spouse_a ML_dec_minor ML_dec_minor_a ML_dec_resp ML_dec_resp_a ML_dec_agric ML_dec_agric_a ML_dec_healthself ML_dec_healthself_a ML_dec_healthchild ML_dec_healthchild_a ML_dec_limit ML_dec_limit_a ML_dec_visits ML_dec_visits_a ML_dec_major ML_dec_major_a"
+
+
+hhd3<- v3 %>% strsplit("[[:space:]]") %>% unlist() %>% match(names(data3)) %>% sort() %>% data3[,.]
+
+
+finalhhd<-merge(hhd1,hhd2,by.x = "HHID", by.y = "HHID") %>%
+  merge(.,hhd3,by.x = "HHID", by.y = "HHID")
+
+rm(v1,v2,v3,data1,data2,data3,hhd1,hhd2,hhd3)
+```
+
+### Step 4. Creating Stratification Variables and Index Variables
+
+Generating stratification variables as designed and implemented by the program designers:
+   They stratified the sample by polygamous households, number of agricultural blocks owned, wife's ability to read and write, length of marriage between primary spouses, and assignment to treatment at the baseline
+   BL- denotes baseline
+   
+```{r}
+#Polygamy
+finalhhd[,"BL_polyghh"]<- ifelse(finalhhd[,"BL_wives_num"]>=2,1,0)
+
+#Number of Blocks
+finalhhd[,"BL_block_num_bin"]<- ifelse(finalhhd[,"BL_block_num"]>3,1,0)
+
+#Wife's ability to read and write
+finalhhd[,"BL_readwrite_w"]<- ifelse(finalhhd[,"BL_write_self_w"]==1 & finalhhd[,"BL_read_self_w"]==1,1,0)
+
+#Length of marriage
+finalhhd[,"BL_marriagelength_bin"]<- ifelse(finalhhd[,"BL_desig_wife_length_marriage"]>20,1,0)
+```
+
+#### Creating Index Components
+Intra-household decision making is not something that can be be measured objectively as it is based on the subjective experience of each spouse regarding who has more say in making decisions in the house. So, similar to proxy income measures organizations like the World Bank and Oxfam have developed different indices to measure household decision-making aggregating different aspects of the same
+   ML- denotes midline
+   This intervention was part of a larger asset redistribution program and the data used was collected at the midline point of the program
+
+```{r}
+#1. Who usually makes decisions about how to earn money for the household?
+finalhhd[,"ML_decearn"]<- ifelse(finalhhd[,"ML_dec_earn"]<=2,1,0)
+
+#2. Who usually makes decisions about how to earn money for the household?
+finalhhd[,"ML_decearn"]<- ifelse(finalhhd[,"ML_dec_earn"]<=2,1,0)
+
+#3. Who usually makes decisions about how your husband's earnings will be used?
+finalhhd[,"ML_decuse"]<- ifelse(finalhhd[,"ML_dec_use"]<=2,1,0)
+
+#3. Who usually makes decisions about how your husband's earnings will be used?
+finalhhd[,"ML_decspouse"]<- ifelse(finalhhd[,"ML_dec_spouse"]<=2,1,0)
+
+#4. Who usually makes decisions about making major household purchases?
+finalhhd[,"ML_decmajor"]<- ifelse(finalhhd[,"ML_dec_major"]<=2,1,0)
+
+#5. Who usually makes decisions about making everyday household purchases?
+finalhhd[,"ML_decminor"]<- ifelse(finalhhd[,"ML_dec_minor"]<=2,1,0)
+
+#6. Who usually makes decisions about how to allocate responsibilities within your household?
+finalhhd[,"ML_decresp"]<- ifelse(finalhhd[,"ML_dec_resp"]<=2,1,0)
+
+#7. Who usually makes decisions about how to use your household’s agricultural land?
+finalhhd[,"ML_decagric"]<- ifelse(finalhhd[,"ML_dec_agric"]<=2,1,0)
+
+#8. 8. Who usually makes decisions about health care for yourself?
+finalhhd[,"ML_dechealthself"]<- ifelse(finalhhd[,"ML_dec_healthself"]<=2,1,0)
+
+#9. Who usually makes decisions about health care for your children?
+finalhhd[,"ML_dechealthchild"]<- ifelse(finalhhd[,"ML_dec_healthchild"]<=2,1,0)
+
+#10. Who usually makes (or made) decisions about whether you should try to limit 
+finalhhd[,"ML_declimit"]<- ifelse(finalhhd[,"ML_dec_limit"]<=2,1,0)
+
+#11. Who usually makes decisions about visits to your family or relatives?
+finalhhd[,"ML_decvisits"]<- ifelse(finalhhd[,"ML_dec_visits"]<=2,1,0)
+```
+
+#### Compiling the indices 
+ -according to research by researchers and Oxfam organization respectively and standradizing them for comparability
+ 
+```{r}
+#Creating index based research study
+finalhhd[,"ML_dec_index"] <- finalhhd[,"ML_decearn"] + finalhhd[,"ML_decuse"] + finalhhd[,"ML_decspouse"] + finalhhd[,"ML_decmajor"] + finalhhd[,"ML_decminor"] + finalhhd[,"ML_decresp"] + finalhhd[,"ML_decagric"] + finalhhd[,"ML_dechealthself"] + finalhhd[,"ML_dechealthchild"] + finalhhd[,"ML_declimit"] + finalhhd[,"ML_decvisits"]
+finalhhd[,"ML_dec_reindex"] <- (finalhhd[,"ML_dec_index"]-mean(finalhhd[,"ML_dec_index"],na.rm=TRUE))/sd(finalhhd[,"ML_dec_index"],na.rm=TRUE)*100
+
+#Creating Index based on Oxfam report
+finalhhd[,"ML_decoxfamindex"]<- finalhhd[,"ML_decearn"] + finalhhd[,"ML_decuse"] + finalhhd[,"ML_decspouse"] + finalhhd[,"ML_decmajor"] + finalhhd[,"ML_decminor"] + finalhhd[,"ML_decagric"] + finalhhd[,"ML_dechealthself"] + finalhhd[,"ML_dechealthchild"] + finalhhd[,"ML_decvisits"]
+finalhhd[,"ML_dec_oxfamindex"] <- (finalhhd[,"ML_decoxfamindex"]-mean(finalhhd[,"ML_decoxfamindex"],na.rm=TRUE))/sd(finalhhd[,"ML_decoxfamindex"],na.rm=TRUE)*100
+```
+
+### Step 5. Running diagnostics to check the independence of treatment group and control group
+
+```{r}
+#Regular Balance Tests
+
+balvars<- "BL_block_num BL_collat BL_reg_num BL_kakira BL_wives_num BL_age_pay_rec BL_age_pay_rec_oth1 BL_age_pay_rec_oth2 BL_age_pay_rec_oth3 BL_gender_pay_rec BL_gender_pay_rec_oth1 BL_gender_pay_rec_oth2 BL_gender_pay_rec_oth3 BL_crop_name_1 BL_crop_name_2 BL_crop_name_3 BL_crop_name_4 BL_crop_harv_quant_1 BL_crop_harv_quant_2 BL_crop_harv_quant_3 BL_crop_harv_quant_4 BL_crop_sold_quant_1 BL_crop_sold_quant_2 BL_crop_sold_quant_3 BL_crop_sold_quant_4 BL_crop_value_1 BL_crop_value_2 BL_crop_value_3 BL_crop_value_4 BL_crop_dec_resp_1 BL_crop_dec_resp_2 BL_crop_dec_resp_3 BL_crop_dec_resp_4 BL_crop_sales_resp_1 BL_crop_sales_resp_2 BL_crop_sales_resp_3 BL_crop_sales_resp_4 BL_spend_child BL_spend_female BL_spend_female BL_spend_oth BL_spend_total BL_tribe_h BL_tribe_w BL_religion_h BL_religion_w BL_read_self_h BL_read_self_w BL_write_self_h BL_write_self_w BL_edu_comp_self_h BL_edu_comp_self_w BL_block_pay BL_block_pay_1 BL_block_pay_2 BL_block_pay_3 BL_block_pay_4 BL_block_pay_5 BL_block_pay_6 BL_block_area_1 BL_block_area_2 BL_block_area_3 BL_block_area_4 BL_block_area_5 BL_block_area_6 BL_reg_hold BL_reg_hold_1 BL_reg_hold_2 BL_reg_hold_3 BL_reg_hold_4 BL_reg_hold_5 BL_reg_hold_6 BL_reg_yr BL_reg_yr_1 BL_reg_yr_2 BL_reg_yr_3 BL_reg_yr_4 BL_reg_yr_5 BL_reg_yr_6 BL_harv_next_yr_1 BL_harv_next_yr_2 BL_harv_next_yr_3 BL_harv_next_yr_4 BL_harv_next_yr_5 BL_harv_next_yr_6 BL_inputs BL_prep BL_prep_credit BL_fert BL_pest BL_water BL_labor BL_trans BL_cash BL_harv BL_harv_sell_quant BL_price BL_net BL_pay_cash BL_pay_prim BL_lab_sug_mth_h BL_lab_sug_mth_w BL_sug_day_h BL_sug_day_w BL_sug_hr_h BL_sug_hr_w BL_non_day_h BL_non_day_w BL_non_hr_h BL_non_hr_w BL_wage_h BL_wage_w BL_farm_wage_earn_h BL_farm_wage_earn_w BL_nonfarm_wage_earn_h BL_nonfarm_wage_earn_w BL_prod_day_housework_h BL_prod_day_waterwood_h BL_prod_day_leisure_h BL_prod_day_housework_w BL_prod_day_waterwood_w BL_prod_day_leisure_w BL_prod_hr_housework_h BL_prod_hr_waterwood_h BL_prod_hr_leisure_h BL_prod_hr_housework_w BL_prod_hr_waterwood_w BL_prod_hr_leisure_w BL_effort_h BL_effort_w BL_effort_spouse_h BL_effort_spouse_w BL_opinion_h BL_opinion_w BL_finalsay_h BL_finalsay_w BL_oth_opinion1_h BL_oth_opinion1_w BL_shouldbe_h BL_shouldbe_w BL_save_h BL_save_w BL_save_hh_h BL_save_hh_w BL_bank_h BL_bank_w BL_loan_h BL_consump_clothes_h BL_consump_clothes_w BL_consump_hair_h BL_consump_hair_w BL_consump_alc_h BL_consump_alc_w BL_consump_gift_h BL_consump_gift_w BL_know_blocks BL_know_quant BL_food1 BL_food2 BL_food3 BL_food4 BL_food5 BL_food6 BL_food7 BL_food8 BL_food9 BL_pregnant BL_preg_avoid BL_dec_cont BL_dec_use_h BL_dec_use_w BL_dec_spouse_h BL_dec_spouse_w BL_dec_healthself_h BL_dec_healthself_w BL_dec_healthchild_h BL_dec_healthchild_w BL_dec_major_h BL_dec_major_w BL_dec_minor_h BL_dec_minor_w BL_dec_visits_h BL_dec_visits_w BL_marqual1_h BL_marqual2_h BL_marqual3_h BL_marqual4_h BL_marqual9_h BL_marqual10_h BL_marqual1_w BL_marqual2_w BL_marqual3_w BL_marqual4_w BL_marqual9_w BL_marqual10_w BL_dv_ever_w BL_dv_freq_male_h BL_dv_freq_female_w BL_dv_reg_w BL_ent_profit_1 BL_ent_profit_2 BL_ent_profit_3 BL_ent_profit_4 BL_crop_name_5 BL_crop_name_6 BL_crop_name_7 BL_crop_name_8 BL_crop_name_9 BL_crop_name_10 BL_crop_name_11 BL_crop_fert BL_crop_pest BL_crop_hire_amt BL_crop_harv_quant_5 BL_crop_harv_quant_6 BL_crop_harv_quant_7 BL_crop_harv_quant_8 BL_crop_harv_quant_9 BL_crop_harv_quant_10 BL_crop_harv_quant_11 BL_crop_sold_quant_5 BL_crop_sold_quant_6 BL_crop_sold_quant_7 BL_crop_sold_quant_8 BL_crop_sold_quant_9 BL_crop_sold_quant_10 BL_crop_value_5 BL_crop_value_6 BL_crop_value_7 BL_crop_value_8 BL_crop_value_9 BL_crop_value_10 BL_crop_dec_resp_5 BL_crop_dec_resp_6 BL_crop_dec_resp_7 BL_crop_dec_resp_6 BL_crop_dec_resp_7 BL_crop_dec_resp_8 BL_crop_dec_resp_9 BL_crop_dec_resp_10 BL_crop_dec_resp_11 BL_crop_sales_resp_5 BL_crop_sales_resp_6 BL_crop_sales_resp_7 BL_crop_sales_resp_8 BL_crop_sales_resp_9 BL_crop_sales_resp_10 BL_crop_sales_resp_11 BL_school_child_2 BL_school_child_3" %>%
+          paste("BL_school_child_4 BL_school_child_5 BL_school_child_6 BL_school_child_7 BL_school_child_8 BL_school_child_9 BL_school_child_10 BL_school_child_11 BL_spend_total_ed_2 BL_spend_total_ed_3 BL_spend_total_ed_4 BL_spend_total_ed_5 BL_spend_total_ed_6 BL_spend_total_ed_7 BL_spend_total_ed_8 BL_spend_total_ed_9 BL_spend_total_ed_10 BL_spend_total_ed_11 BL_wife_arrange_1 BL_wife_arrange_2 BL_wife_arrange_3 BL_wife_arrange_4 BL_wife_arrange_5 BL_child_num BL_child_live", sep=" ") %>%
+            strsplit("[[:space:]]") %>% unlist()
+
+
+balRegs<-vector("list",275)
+
+balRegs<-lapply(balvars,function(x){
+  f<-as.formula(paste(x,"treat_workshop + BL_polyghh + BL_block_num_bin +BL_readwrite_w + BL_marriagelength_bin",sep="~"))
+  tidy(lm(f, data= finalhhd,na.action = na.exclude))
+})
+
+balResults<-matrix(nrow=275,ncol=3)
+colnames(balResults)<-c("Variable","Estimate","PValue")
+
+for (i in 1:275){
+  balResults[i,1]<-balvars[i]
+  balResults[i,2]<-balRegs[[i]][[2,2]]
+  balResults[i,3]<-balRegs[[i]][[2,5]]
+}
+
+which(balResults[,"PValue"]<=0.1 ) %>% balResults[.,1]
+
+#Kolmogorov Smirnov Test
+
+KStests<-vector("list",275)
+KStests<-lapply(balvars,function(x){
+  ks.boot(finalhhd[which(finalhhd$treat_workshop==1),paste0(x)],finalhhd[which(finalhhd$treat_workshop==0),paste0(x)], alternative = "two.sided",print.level = 1)
+})
+
+ksTable<-matrix(nrow=275,ncol=2)
+colnames(ksTable)<-c("Variable","PValue")
+for (i in 1:275){
+  ksTable[i,1]<-balvars[i]
+  ksTable[i,2]<-KStests[[i]][[1]]
+}
+
+which(ksTable[,"PValue"]<=0.1 ) %>% ksTable[.,1]
+```
+
+The following variables/combination of variables were found to be significantly different between treatment group and control group at the baseline and hence has to be controlled for in the impact evaluation to get unbiased estimates of the effect of the program
+
+```{r}
+#Totaled Marital Quality questions asked to the wife
+finalhhd[,"BL_marqual_index_w"] <- finalhhd[,"BL_marqual1_w"] + finalhhd[,"BL_marqual2_w"] + finalhhd[,"BL_marqual3_w"] + finalhhd[,"BL_marqual4_w"] + finalhhd[,"BL_marqual9_w"] + finalhhd[,"BL_marqual10_w"]
+
+#Can you read and write in any language asked to the husband
+finalhhd[,"BL_read_write_self_h"] <- ifelse(finalhhd[,"BL_write_self_h"] == 1 & finalhhd[,"BL_read_self_h"] == 1,1,0)
+
+
+#What is the highest level of formal school that you've received? (wife) Those who have not attended school are included in this variable as zero
+finalhhd[,"BL_highesteduc_w"] <-ifelse(finalhhd[,"BL_school_self_w"] == 1 | finalhhd[,"BL_school_self_w"] == 3,0,finalhhd[,"BL_edu_comp_self_w"]) 
+
+```
+
+```{r}
+#Joint Orthogonality Test to check if the variables together explain any difference between treatment group and control group
+jovars<-"BL_read_write_self_h BL_highesteduc_w BL_marqual_index_w BL_dec_spouse_h BL_cash BL_polyghh BL_block_num_bin BL_readwrite_w BL_marriagelength_bin BL_WH_dummy BL_any_selfish_ineff BL_block_num	BL_collat	BL_reg_num BL_kakira BL_wives_num BL_age_pay_rec BL_gender_pay_rec BL_crop_name_2	BL_crop_name_3 BL_crop_name_4 BL_crop_harv_quant_1 BL_crop_harv_quant_2 BL_crop_harv_quant_3 BL_crop_dec_resp_1 BL_crop_dec_resp_2 BL_crop_dec_resp_3 BL_crop_dec_resp_4 BL_crop_sales_resp_1 BL_crop_sales_resp_2 BL_crop_sales_resp_3 BL_crop_sales_resp_4 BL_spend_child BL_spend_female	BL_spend_female	BL_spend_oth BL_spend_total BL_tribe_h BL_tribe_w BL_religion_h	BL_religion_w	BL_read_self_h BL_read_self_w BL_write_self_w	BL_edu_comp_self_h BL_edu_comp_self_w BL_inputs BL_prep	BL_prep_credit BL_fert BL_pest BL_water	BL_labor BL_trans	BL_cash BL_price BL_net BL_pay_cash	BL_pay_prim	BL_lab_sug_mth_h BL_lab_sug_mth_w	BL_sug_day_h BL_non_day_h	BL_non_day_w BL_non_hr_h BL_non_hr_w BL_wage_h BL_wage_w BL_farm_wage_earn_h BL_farm_wage_earn_w BL_nonfarm_wage_earn_h	BL_nonfarm_wage_earn_w BL_prod_day_housework_h BL_prod_day_waterwood_h BL_prod_day_leisure_h BL_prod_day_housework_w BL_prod_day_waterwood_w BL_prod_day_leisure_w BL_prod_hr_housework_w BL_effort_h BL_effort_w BL_effort_spouse_h BL_opinion_h	BL_opinion_w BL_finalsay_h	BL_finalsay_w BL_bank_h	BL_bank_w	BL_loan_h	BL_consump_clothes_h BL_consump_clothes_w BL_consump_hair_h	BL_consump_hair_w	BL_consump_alc_h BL_consump_alc_w BL_consump_gift_h	BL_consump_gift_w	BL_know_blocks BL_food1	BL_food2 BL_food3 BL_food4 BL_food5 BL_food6 BL_food7 BL_food8 BL_food9 BL_pregnant BL_preg_avoid	BL_dec_cont	BL_dec_use_h BL_dec_use_w BL_dec_spouse_h BL_dec_spouse_w	BL_dec_healthself_h	BL_dec_healthself_w BL_dec_healthchild_h BL_dec_healthchild_w BL_dec_major_h BL_dec_major_w BL_dec_minor_h BL_dec_minor_w BL_dec_visits_h	BL_dec_visits_w	BL_marqual1_h	BL_marqual2_h	BL_marqual3_h	BL_marqual4_h BL_marqual9_h BL_marqual10_h BL_dv_ever_w BL_dv_freq_male_h BL_crop_fert BL_crop_pest BL_child_num BL_child_live" %>% strsplit("[[:space:]]") %>% unlist() 
+joctest <- paste("treat_workshop",paste0(jovars,collapse = "+"),sep = '~') %>% as.formula() %>% lm(.,data=finalhhd,na.action = na.exclude)
+summary(joctest)
+```
+
+### Step 6. Running evaluation regressions and exporting data
+
+```{r}
+controlvars <- "BL_polyghh BL_block_num_bin BL_readwrite_w BL_marriagelength_bin BL_WH_dummy BL_any_selfish_ineff BL_read_write_self_h BL_highesteduc_w BL_marqual_index_w BL_dec_spouse_h BL_cash treat_contract" %>% 
+  strsplit("[[:space:]]") %>% unlist()
+reglist <- "ML_dec_reindex ML_dec_oxfamindex ML_decearn ML_decuse ML_decspouse ML_decmajor ML_decminor ML_decresp ML_decagric ML_dechealthself ML_dechealthchild ML_declimit ML_decvisits" %>% 
+  strsplit("[[:space:]]") %>% unlist()
+
+regmodelitt<- vector("list")
+regmodellate<-vector("list")
+
+## ITT
+for (vars in reglist){
+  regmodelitt[[vars]]<-paste(vars,paste("treat_workshop",paste0(controlvars,collapse = '+'),sep='+'), sep = '~') %>% as.formula() %>%
+    lm(.,data = finalhhd) %>% tidy(conf.int = TRUE)
+}
+
+ittRes<-data.frame(regmodelitt)
+#Creating attendance variable to calculate LATE through 2sls method
+finalhhd[,"assignandattend"] <-ifelse(finalhhd[,"WI_hh_fully_attended_workshop"] == 1 & finalhhd[,"treat_workshop"] == 1,1,0)
+
+#LATE
+
+for (vars in reglist){
+  regmodellate[[vars]]<-paste(vars,paste("treat_workshop",paste0(controlvars,collapse = '+'),sep='+'), sep = '~') %>% paste(.,paste("assignandattend",paste0(controlvars,collapse = '+'),sep='+'),sep='|') %>% as.formula() %>%
+    ivreg(.,data = finalhhd) %>% tidy(conf.int = TRUE)
+}
+
+lateRes<-data.frame(regmodellate)
+```
+
+## End of File
